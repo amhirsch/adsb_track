@@ -2,7 +2,6 @@ import sqlite3
 import pyModeS as pms
 from pyModeS.extra.tcpclient import TcpClient
 
-import adsb_track.decode as decode
 import adsb_track.database as database
 
 
@@ -38,7 +37,7 @@ class Database:
         callsign = pms.adsb.callsign(msg).strip('_')
         category = pms.adsb.category(msg)
         database.insert_ident(self.cur, ts, icao, callsign, tc, category)
-    
+
     @log
     def log_velocity(self, msg, ts, icao):
         velocity = pms.adsb.velocity(msg, True)
@@ -52,8 +51,8 @@ class FlightRecorder(TcpClient):
 
 
     def process_msg(self, msg, ts, icao, tc):
-        # if tc in tuple(range(1,5)):
-        #     self.db.log_ident(msg, ts, icao, tc)
+        if tc in tuple(range(1,5)):
+            self.db.log_ident(msg, ts, icao, tc)
         if tc == 19:
             print(pms.adsb.velocity(msg, True))
             self.db.log_velocity(msg, ts, icao)
@@ -69,6 +68,7 @@ class FlightRecorder(TcpClient):
 
             self.process_msg(msg, ts, icao, tc)
 
+
     def record(self):
         try:
             self.run()
@@ -79,5 +79,5 @@ class FlightRecorder(TcpClient):
 if __name__ == '__main__':
     # client = ADSBClient('pi.lan.xanderhirsch.us')
     # client.run()
-    client = FlightRecorder('pi.lan.xanderhirsch.us', 'new-test.db', buffer=5)
+    client = FlightRecorder('pi.lan.xanderhirsch.us', 'test.db')
     client.record()
