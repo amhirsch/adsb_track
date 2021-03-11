@@ -10,12 +10,12 @@ UNIVERSAL_COLUMNS = (
 PRIMARY_KEYS = f"PRIMARY KEY ({','.join([x[0] for x in UNIVERSAL_COLUMNS])})"
 
 
-def column_declaration(name, dtype):
-    return f'{name} {dtype} NOT NULL'
+def column_declaration(name, dtype, not_null=True):
+    return f"{name} {dtype}{' NOT NULL' if not_null else ''}"
 
 
 def sql_create(table_def):
-    columns = ','.join([column_declaration(x, y) for x, y
+    columns = ','.join([column_declaration(*x) for x
                         in UNIVERSAL_COLUMNS + table_def[COLUMNS]])
     return f'{CREATE_TABLE} {table_def[NAME]} ({columns})'
 
@@ -53,10 +53,22 @@ VELOCITY_TABLE = {
 }
 VELOCITY_CREATE, VELOCITY_INSERT = sql_func(VELOCITY_TABLE)
 
+POSITION_TABLE = {
+    NAME: 'position',
+    COLUMNS: (
+        ('latitude', 'REAL', False),
+        ('longitude', 'REAL', False),
+        ('altitude', 'INTEGER'),
+        ('altitude_src', 'TEXT'),
+    )
+}
+POSITION_CREATE, POSITION_INSERT = sql_func(POSITION_TABLE)
+
 
 def initialize(con, cur):
     cur.execute(IDENT_CREATE)
     cur.execute(VELOCITY_CREATE)
+    cur.execute(POSITION_CREATE)
     con.commit()
 
 def insert_ident(cur, ts, icao, callsign, tc, cat):
@@ -67,3 +79,7 @@ def insert_velocity(cur, ts, icao, spd, angle, vs, spd_type,
                     angle_src, vs_src):
     cur.execute(VELOCITY_INSERT,
                 (ts, icao, spd, spd_type, vs, vs_src, angle, angle_src))
+
+
+def insert_position(cur, ts, icao, lat, lon, alt, alt_src):
+    cur.execute(POSITION_INSERT, (ts, icao, lat, lon, alt, alt_src))
