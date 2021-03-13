@@ -19,7 +19,7 @@ class Aircraft:
 
     def __str__(self):
         return (
-            f'------ {self.icao} ------\n'
+            f"------ {self.icao if self.callsign is None else self.callsign} ------\n"
             f'  ({self.latitude}, {self.longitude})  {self.altitude} ft\n'
             f'  {self.heading} degrees, {self.velocity} knots, {self.vertical_speed} ft/sec'
         )
@@ -37,24 +37,27 @@ class Aircraft:
             return ts
         elif isinstance(ts, float):
             return dt.fromtimestamp(ts)
+    
+    def is_update(ts, comparison):
+        return (comparison is None) or (ts > comparison)
 
     def update_callsign(self, ts, callsign):
-        ts = self.process_timestamp(ts)
-        if ts > self.callsign_update:
+        ts = Aircraft.process_timestamp(ts)
+        if Aircraft.is_update(ts, self.callsign_update):
             self.callsign_update = ts
             self.callsign = callsign
 
     def update_position(self, ts, lat, lon, alt):
-        ts = self.process_timestamp(ts)
-        if ts > self.position_update:
+        ts = Aircraft.process_timestamp(ts)
+        if  Aircraft.is_update(ts, self.position_update):
             self.position_update = ts
             self.latitude = lat
             self.longitude = lon
             self.altitude = alt
 
     def update_velocity(self, ts, heading, velocity, vertical_speed):
-        ts = self.process_timestamp(ts)
-        if ts > self.velocity_update:
+        ts = Aircraft.process_timestamp(ts)
+        if Aircraft.is_update(ts, self.velocity_update):
             self.velocity_update = ts
             self.heading = heading
             self.velocity = velocity

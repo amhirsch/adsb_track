@@ -4,19 +4,20 @@ import pyModeS as pms
 from pyModeS.extra.tcpclient import TcpClient
 
 import adsb_track.database as database
+from adsb_track.aircraft import Aircraft
 
 
 TC_POS = tuple(range(9, 19)) + tuple(range(20, 23))
 
 
 class Database:
-    def __init__(self, name, gs_lat, gs_lon, buffer=50):
+    def __init__(self, name, buffer=50):
         self.con = sqlite3.connect(name)
         self.cur = self.con.cursor()
         self.max_buffer = buffer
         self.buffer = 0
-        self.gs_lat = gs_lat
-        self.gs_lon = gs_lon
+        # self.gs_lat = gs_lat
+        # self.gs_lon = gs_lon
         database.initialize(self.con, self.cur)
 
 
@@ -39,41 +40,66 @@ class Database:
 
 
     @log
-    def log_ident(self, msg, ts, icao, tc):
-        callsign = pms.adsb.callsign(msg).strip('_')
-        category = pms.adsb.category(msg)
+    def log_ident(self, ts, icao, callsign, tc, category):
         database.insert_ident(self.cur, ts, icao, callsign, tc, category)
 
     @log
-    def log_velocity(self, msg, ts, icao):
-        velocity = pms.adsb.velocity(msg, True)
-        database.insert_velocity(self.cur, ts, icao, *velocity)
-    
+    def log_velocity(self, ts, icao, spd, angle, vs, spd_type, angle_src, vs_src):
+        database.insert_velocity(self.cur, ts, icao, spd, angle, vs, spd_type, angle_src, vs_src)
+
     @log
-    def log_position(self, msg, ts, icao, tc):
-        alt_src = 'BARO' if tc < 19 else 'GNSS'
-        alt = pms.adsb.altitude(msg)
-        # print(msg, self.gs_lat, self.gs_lon)
-        lat, lon = pms.adsb.position_with_ref(msg, self.gs_lat, self.gs_lon)
-        # print(f'{icao}, ({lat}, {lon})')
+    def log_position(self, ts, icao, lat, lon, alt, alt_src):
         database.insert_position(self.cur, ts, icao, lat, lon, alt, alt_src)
 
 
 class FlightRecorder(TcpClient):
     def __init__(self, host, db, gs_lat, gs_lon, port=30005, rawtype='beast', buffer=25):
         super(FlightRecorder, self).__init__(host, port, rawtype)
-        self.db = Database(db, gs_lat, gs_lon, buffer)
-
+        self.gs_lat = gs_lat
+        self.gs_lon = gs_lon
+        self.airspace = {}
+        self.db = Database(db, buffer)
 
     def process_msg(self, msg, ts, icao, tc):
         if tc in TC_POS:
-            self.db.log_position(msg, ts, icao, tc)
+            self.process_position(msg, ts, icao, tc)
         elif tc == 19:
-            self.db.log_velocity(msg, ts, icao)
+            self.process_velocity(msg, ts, icao)
         elif tc in tuple(range(1,5)):
-            self.db.log_ident(msg, ts, icao, tc)
-            
+            self.process_ident(msg, ts, icao, tc)
 
+    def process_position(self, msg, ts, icao, tc):
+        alt_src = 'BARO' if tc < 19 else 'GNSS'
+        alt = pms.adsb.altitude(msg)
+        lat, lon = pms.adsb.position_with_ref(msg, self.gs_lat, self.gs_lon)
+
+        self.db.log_position(ts, icao, lat, lon, alt, alt_src)
+
+        if icao not in self.airspace:
+            self.airspace[icao] = Aircraft(icao)
+        self.airspace[icao].update_position(ts, lat, lon, alt)
+
+    def process_velocity(self, msg, ts, icao):
+        velocity = pms.adsb.velocity(msg, True)
+        heading = velocity[1]
+        speed = velocity[0]
+        vertical_speed = velocity[2]
+
+        self.db.log_velocity(ts, icao, *velocity)
+
+        if icao not in self.airspace:
+            self.airspace[icao] = Aircraft(icao)
+        self.airspace[icao].update_velocity(ts, heading, speed, vertical_speed)
+
+    def process_ident(self, msg, ts, icao, tc):
+        callsign = pms.adsb.callsign(msg).strip('_')
+        category = pms.adsb.category(msg)
+
+        self.db.log_ident(ts, icao, callsign, tc, category)
+
+        if icao not in self.airspace:
+            self.airspace[icao] = Aircraft(icao)
+        self.airspace[icao].update_callsign(ts, callsign)
 
     def handle_messages(self, messages):
         for msg, ts in messages:
@@ -84,7 +110,6 @@ class FlightRecorder(TcpClient):
             tc = pms.adsb.typecode(msg)
 
             self.process_msg(msg, ts, icao, tc)
-
 
     def record(self):
         try:
