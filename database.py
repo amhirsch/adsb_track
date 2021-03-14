@@ -50,7 +50,7 @@ def _sql_insert(table_def):
     return f"INSERT INTO {table_def[_NAME]} ({columns}) VALUES ({values})"
 
 
-class DatabaseSQL(ABC):
+class DBSQL(ABC):
     IDENT_TABLE = {
         _NAME: IDENT,
         _COLUMNS: {
@@ -96,7 +96,7 @@ class DatabaseSQL(ABC):
         self.con.commit()
         self.buffer = 0
 
-    def log(func):
+    def insert(func):
         def wrapper(self, *args, **kwargs):
             self.buffer += 1
             func(self, *args, **kwargs)
@@ -104,20 +104,21 @@ class DatabaseSQL(ABC):
                 self.commit()
         return wrapper
 
-    @log
-    def insert_ident(self, ts, icao, callsign, tc, cat):
-        self.cur.execute(IDENT_INSERT, (ts, icao, callsign, tc, cat))
+    @insert
+    def record_ident(self, ts, icao, callsign, tc, cat):
+        self.cur.execute(self.IDENT_INSERT, (ts, icao, callsign, tc, cat))
 
     # Order meant to match pyModeS return
-    @log
-    def insert_velocity(self, ts, icao, spd, angle, vs, spd_type,
+    @insert
+    def record_velocity(self, ts, icao, spd, angle, vs, spd_type,
                         angle_src, vs_src):
-        self.cur.execute(VELOCITY_INSERT, (ts, icao, spd, spd_type,
-                                           vs, vs_src,angle, angle_src))
+        self.cur.execute(self.VELOCITY_INSERT, (ts, icao, spd, spd_type,
+                                                vs, vs_src,angle, angle_src))
 
-    @log
-    def insert_position(self, ts, icao, lat, lon, alt, alt_src):
-        self.cur.execute(POSITION_INSERT, (ts, icao, lat, lon, alt, alt_src))
+    @insert
+    def record_position(self, ts, icao, lat, lon, alt, alt_src):
+        self.cur.execute(self.POSITION_INSERT, (ts, icao, lat, lon,
+                                                alt, alt_src))
 
     @abstractmethod
     def __init__(self, max_buffer):
@@ -125,7 +126,7 @@ class DatabaseSQL(ABC):
         self.buffer = 0
 
 
-class DatabaseSQLite(DatabaseSQL):
+class DBSQLite(DBSQL):
     PRIMARY_KEY_COL = 'id INTEGER PRIMARY KEY AUTOINCREMENT'
 
     TEXT = 'TEXT'
@@ -134,7 +135,7 @@ class DatabaseSQLite(DatabaseSQL):
 
     UNIVERSAL_COLUMNS = {TIMESTAMP: REAL, ICAO: TEXT}
 
-    IDENT_TABLE = deepcopy(DatabaseSQL.IDENT_TABLE)
+    IDENT_TABLE = deepcopy(DBSQL.IDENT_TABLE)
     IDENT_TABLE[_COLUMNS] = {
         CALLSIGN: TEXT,
         TYPECODE: INTEGER,
@@ -142,7 +143,7 @@ class DatabaseSQLite(DatabaseSQL):
     }
     IDENT_CREATE = _sql_create(IDENT_TABLE, PRIMARY_KEY_COL, UNIVERSAL_COLUMNS)
 
-    VELOCITY_TABLE = deepcopy(DatabaseSQL.VELOCITY_TABLE)
+    VELOCITY_TABLE = deepcopy(DBSQL.VELOCITY_TABLE)
     VELOCITY_TABLE[_COLUMNS] = {
         SPEED: INTEGER,
         SPEED_TYPE: TEXT,
@@ -154,13 +155,13 @@ class DatabaseSQLite(DatabaseSQL):
     VELOCITY_CREATE = _sql_create(VELOCITY_TABLE, PRIMARY_KEY_COL,
                                   UNIVERSAL_COLUMNS)
 
-    POSITION_TABLE = deepcopy(DatabaseSQL.POSITION_TABLE)
+    POSITION_TABLE = deepcopy(DBSQL.POSITION_TABLE)
     POSITION_TABLE[_COLUMNS][LATITUDE][0] = REAL
     POSITION_TABLE[_COLUMNS][LONGITUDE][0] = REAL
-    POSITION_TABLE[_COLUMNS] = {
+    POSITION_TABLE[_COLUMNS].update({
         ALTITUDE: INTEGER,
         ALTITUDE_SRC: TEXT,
-    }
+    })
     POSITION_CREATE = _sql_create(POSITION_TABLE, PRIMARY_KEY_COL,
                                   UNIVERSAL_COLUMNS)
 
@@ -170,4 +171,3 @@ class DatabaseSQLite(DatabaseSQL):
         self.con = sqlite3.connect(name)
         self.cur = self.con.cursor()
         self.initialize()
-

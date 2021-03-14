@@ -3,53 +3,11 @@ import sqlite3
 import pyModeS as pms
 from pyModeS.extra.tcpclient import TcpClient
 
-import adsb_track.database as database
 from adsb_track.aircraft import Aircraft
+from adsb_track.database import DBSQLite
 
 
 TC_POS = tuple(range(9, 19)) + tuple(range(20, 23))
-
-
-class Database:
-    def __init__(self, name, buffer=50):
-        self.con = sqlite3.connect(name)
-        self.cur = self.con.cursor()
-        self.max_buffer = buffer
-        self.buffer = 0
-        # self.gs_lat = gs_lat
-        # self.gs_lon = gs_lon
-        database.initialize(self.con, self.cur)
-
-
-    def commit(self):
-        # print('buffer cleared')
-        self.con.commit()
-        self.buffer = 0
-
-
-    def log(func):
-        def wrapper(self, *args, **kwargs):
-            self.buffer += 1
-
-            func(self, *args, **kwargs)
-
-            if self.buffer >= self.max_buffer:
-                self.commit()
-
-        return wrapper
-
-
-    @log
-    def log_ident(self, ts, icao, callsign, tc, category):
-        database.insert_ident(self.cur, ts, icao, callsign, tc, category)
-
-    @log
-    def log_velocity(self, ts, icao, spd, angle, vs, spd_type, angle_src, vs_src):
-        database.insert_velocity(self.cur, ts, icao, spd, angle, vs, spd_type, angle_src, vs_src)
-
-    @log
-    def log_position(self, ts, icao, lat, lon, alt, alt_src):
-        database.insert_position(self.cur, ts, icao, lat, lon, alt, alt_src)
 
 
 class FlightRecorder(TcpClient):
@@ -58,7 +16,7 @@ class FlightRecorder(TcpClient):
         self.gs_lat = gs_lat
         self.gs_lon = gs_lon
         self.airspace = {}
-        self.db = Database(db, buffer)
+        self.db = DBSQLite(db, buffer)
 
     def process_msg(self, msg, ts, icao, tc):
         if tc in TC_POS:
@@ -73,7 +31,7 @@ class FlightRecorder(TcpClient):
         alt = pms.adsb.altitude(msg)
         lat, lon = pms.adsb.position_with_ref(msg, self.gs_lat, self.gs_lon)
 
-        self.db.log_position(ts, icao, lat, lon, alt, alt_src)
+        self.db.record_position(ts, icao, lat, lon, alt, alt_src)
 
         if icao not in self.airspace:
             self.airspace[icao] = Aircraft(icao)
@@ -85,7 +43,7 @@ class FlightRecorder(TcpClient):
         speed = velocity[0]
         vertical_speed = velocity[2]
 
-        self.db.log_velocity(ts, icao, *velocity)
+        self.db.record_velocity(ts, icao, *velocity)
 
         if icao not in self.airspace:
             self.airspace[icao] = Aircraft(icao)
@@ -95,7 +53,7 @@ class FlightRecorder(TcpClient):
         callsign = pms.adsb.callsign(msg).strip('_')
         category = pms.adsb.category(msg)
 
-        self.db.log_ident(ts, icao, callsign, tc, category)
+        self.db.record_ident(ts, icao, callsign, tc, category)
 
         if icao not in self.airspace:
             self.airspace[icao] = Aircraft(icao)
