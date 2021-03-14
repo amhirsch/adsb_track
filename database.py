@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 import sqlite3
 
+from adsb_track.const import *
+
 
 _NAME = 'name'
 _COLUMNS = 'columns'
@@ -9,8 +11,8 @@ _COLUMNS = 'columns'
 _CREATE_TABLE = 'CREATE TABLE IF NOT EXISTS'
 
 _UNIVERSAL_COLUMNS = {
-    'timestamp': None,
-    'icao': None,
+    TIMESTAMP: None,
+    ICAO: None,
 }
 
 
@@ -50,35 +52,35 @@ def _sql_insert(table_def):
 
 class DatabaseSQL(ABC):
     IDENT_TABLE = {
-        _NAME: 'ident',
+        _NAME: IDENT,
         _COLUMNS: {
-            'callsign': None,
-            'typecode': None,
-            'category': None,
+            CALLSIGN: None,
+            TYPECODE: None,
+            CATEGORY: None,
         }
     }
     IDENT_INSERT = _sql_insert(IDENT_TABLE)
 
     VELOCITY_TABLE = {
-        _NAME: 'velocity',
+        _NAME: VELOCITY,
         _COLUMNS: {
-            'speed': None,
-            'speed_type': None,
-            'vert_speed': None,
-            'vert_speed_src': None,
-            'angle': None,
-            'angle_src': None,
+            SPEED: None,
+            SPEED_TYPE: None,
+            VERTICAL_SPEED: None,
+            VERTICAL_SPEED_SRC: None,
+            ANGLE: None,
+            ANGLE_SRC: None,
         }
     }
     VELOCITY_INSERT = _sql_insert(VELOCITY_TABLE)
 
     POSITION_TABLE = {
-        _NAME: 'position',
+        _NAME: POSITION,
         _COLUMNS: {
-            'latitude': [None, False],
-            'longitude': [None, False],
-            'altitude': None,
-            'altitude_src': None,
+            LATITUDE: [None, False],
+            LONGITUDE: [None, False],
+            ALTITUDE: None,
+            ALTITUDE_SRC: None,
         }
     }
     POSITION_INSERT = _sql_insert(POSITION_TABLE)
@@ -110,8 +112,8 @@ class DatabaseSQL(ABC):
     @log
     def insert_velocity(self, ts, icao, spd, angle, vs, spd_type,
                         angle_src, vs_src):
-        self.cur.execute(VELOCITY_INSERT,
-                    (ts, icao, spd, spd_type, vs, vs_src, angle, angle_src))
+        self.cur.execute(VELOCITY_INSERT, (ts, icao, spd, spd_type,
+                                           vs, vs_src,angle, angle_src))
 
     @log
     def insert_position(self, ts, icao, lat, lon, alt, alt_src):
@@ -124,38 +126,43 @@ class DatabaseSQL(ABC):
 
 
 class DatabaseSQLite(DatabaseSQL):
-
     PRIMARY_KEY_COL = 'id INTEGER PRIMARY KEY AUTOINCREMENT'
 
     TEXT = 'TEXT'
     INTEGER = 'INTEGER'
     REAL = 'REAL'
 
-    UNIVERSAL_COLUMNS = deepcopy(_UNIVERSAL_COLUMNS)
-    UNIVERSAL_COLUMNS['timestamp'] = REAL
-    UNIVERSAL_COLUMNS['icao'] = TEXT
+    UNIVERSAL_COLUMNS = {TIMESTAMP: REAL, ICAO: TEXT}
 
     IDENT_TABLE = deepcopy(DatabaseSQL.IDENT_TABLE)
-    IDENT_TABLE[_COLUMNS]['callsign'] = TEXT
-    IDENT_TABLE[_COLUMNS]['typecode'] = INTEGER
-    IDENT_TABLE[_COLUMNS]['category'] = INTEGER
+    IDENT_TABLE[_COLUMNS] = {
+        CALLSIGN: TEXT,
+        TYPECODE: INTEGER,
+        CATEGORY: INTEGER,
+    }
     IDENT_CREATE = _sql_create(IDENT_TABLE, PRIMARY_KEY_COL, UNIVERSAL_COLUMNS)
 
     VELOCITY_TABLE = deepcopy(DatabaseSQL.VELOCITY_TABLE)
-    VELOCITY_TABLE[_COLUMNS]['speed'] = INTEGER
-    VELOCITY_TABLE[_COLUMNS]['speed_type'] = TEXT
-    VELOCITY_TABLE[_COLUMNS]['vert_speed'] = INTEGER
-    VELOCITY_TABLE[_COLUMNS]['vert_speed_src'] = TEXT
-    VELOCITY_TABLE[_COLUMNS]['angle'] = REAL
-    VELOCITY_TABLE[_COLUMNS]['angle_src'] = TEXT
-    VELOCITY_CREATE = _sql_create(VELOCITY_TABLE, PRIMARY_KEY_COL, UNIVERSAL_COLUMNS)
+    VELOCITY_TABLE[_COLUMNS] = {
+        SPEED: INTEGER,
+        SPEED_TYPE: TEXT,
+        VERTICAL_SPEED: INTEGER,
+        VERTICAL_SPEED_SRC: TEXT,
+        ANGLE: REAL,
+        ANGLE_SRC: TEXT,
+    }
+    VELOCITY_CREATE = _sql_create(VELOCITY_TABLE, PRIMARY_KEY_COL,
+                                  UNIVERSAL_COLUMNS)
 
     POSITION_TABLE = deepcopy(DatabaseSQL.POSITION_TABLE)
-    POSITION_TABLE[_COLUMNS]['latitude'][0] = REAL
-    POSITION_TABLE[_COLUMNS]['longitude'][0] = REAL
-    POSITION_TABLE[_COLUMNS]['altitude'] = INTEGER
-    POSITION_TABLE[_COLUMNS]['altitude_src'] = TEXT
-    POSITION_CREATE = _sql_create(POSITION_TABLE, PRIMARY_KEY_COL, UNIVERSAL_COLUMNS)
+    POSITION_TABLE[_COLUMNS][LATITUDE][0] = REAL
+    POSITION_TABLE[_COLUMNS][LONGITUDE][0] = REAL
+    POSITION_TABLE[_COLUMNS] = {
+        ALTITUDE: INTEGER,
+        ALTITUDE_SRC: TEXT,
+    }
+    POSITION_CREATE = _sql_create(POSITION_TABLE, PRIMARY_KEY_COL,
+                                  UNIVERSAL_COLUMNS)
 
 
     def __init__(self, name, buffer=50):
