@@ -8,7 +8,8 @@ from adsb_track.const import *
 _NAME = 'name'
 _COLUMNS = 'columns'
 
-_CREATE_TABLE = 'CREATE TABLE IF NOT EXISTS'
+_CREATE_TABLE, _CREATE_VIEW = [f'CREATE {x} IF NOT EXISTS'
+                               for x in ('TABLE', 'VIEW')]
 
 _UNIVERSAL_COLUMNS = {
     TIMESTAMP: None,
@@ -40,6 +41,17 @@ def _sql_create(table_def, pk_sql, universal_columns):
             raise ValueError(f'Bad column definition for {col}')
 
     return f"{_CREATE_TABLE} {table_def[_NAME]} ({', '.join(sql_columns)})"
+
+
+def _sql_view(table_def, sql_datetime, limit=20):
+    view_name = table_def[_NAME] + '_recent'
+    datetime_col = sql_datetime.format(TIMESTAMP)
+    columns = ', '.join([datetime_col, ICAO]
+                         + list(table_def[_COLUMNS].keys()))
+    return (
+        f'{_CREATE_VIEW} {view_name} AS SELECT {columns} FROM {table_def[_NAME]} '
+        f'ORDER BY {TIMESTAMP} DESC LIMIT {limit}'
+    )
 
 
 def _sql_insert(table_def):
@@ -86,11 +98,12 @@ class DBSQL(ABC):
     POSITION_INSERT = _sql_insert(POSITION_TABLE)
 
 
-    def initialize(self):
+    def initialize(self, commit=True):
         self.cur.execute(self.IDENT_CREATE)
         self.cur.execute(self.VELOCITY_CREATE)
         self.cur.execute(self.POSITION_CREATE)
-        self.con.commit()
+        if commit:
+            self.con.commit()
 
     def commit(self):
         self.con.commit()
@@ -132,6 +145,7 @@ class DBSQLite(DBSQL):
     TEXT = 'TEXT'
     INTEGER = 'INTEGER'
     REAL = 'REAL'
+    SQL_DATETIME = "datetime({}, 'unixepoch', 'localtime')"
 
     UNIVERSAL_COLUMNS = {TIMESTAMP: REAL, ICAO: TEXT}
 
@@ -142,6 +156,7 @@ class DBSQLite(DBSQL):
         CATEGORY: INTEGER,
     }
     IDENT_CREATE = _sql_create(IDENT_TABLE, PRIMARY_KEY_COL, UNIVERSAL_COLUMNS)
+    IDENT_VIEW = _sql_view(IDENT_TABLE, SQL_DATETIME)
 
     VELOCITY_TABLE = deepcopy(DBSQL.VELOCITY_TABLE)
     VELOCITY_TABLE[_COLUMNS] = {
@@ -154,6 +169,7 @@ class DBSQLite(DBSQL):
     }
     VELOCITY_CREATE = _sql_create(VELOCITY_TABLE, PRIMARY_KEY_COL,
                                   UNIVERSAL_COLUMNS)
+    VELOCITY_VIEW = _sql_view(VELOCITY_TABLE, SQL_DATETIME)
 
     POSITION_TABLE = deepcopy(DBSQL.POSITION_TABLE)
     POSITION_TABLE[_COLUMNS][LATITUDE][0] = REAL
@@ -164,7 +180,14 @@ class DBSQLite(DBSQL):
     })
     POSITION_CREATE = _sql_create(POSITION_TABLE, PRIMARY_KEY_COL,
                                   UNIVERSAL_COLUMNS)
+    POSITION_VIEW = _sql_view(POSITION_TABLE, SQL_DATETIME)
 
+    def initialize(self):
+        super().initialize(False)
+        self.cur.execute(self.IDENT_VIEW)
+        self.cur.execute(self.VELOCITY_VIEW)
+        self.cur.execute(self.POSITION_VIEW)
+        self.con.commit()
 
     def __init__(self, name, buffer=50):
         super().__init__(buffer)
