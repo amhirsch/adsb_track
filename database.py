@@ -62,7 +62,19 @@ def _sql_insert(table_def):
     return f"INSERT INTO {table_def[_NAME]} ({columns}) VALUES ({values})"
 
 
+def _sql_col_indices(table_def):
+    columns = list(_UNIVERSAL_COLUMNS.keys()) + list(table_def[_COLUMNS].keys())
+    index_map = {}
+    for i in range(len(columns)):
+        index_map[columns[i]] = i
+    return index_map
+
+
 class DBSQL(ABC):
+
+    TIMESTAMP_INDEX = 0
+    ICAO_INDEX = 1
+
     IDENT_TABLE = {
         _NAME: IDENT,
         _COLUMNS: {
@@ -72,6 +84,7 @@ class DBSQL(ABC):
         }
     }
     IDENT_INSERT = _sql_insert(IDENT_TABLE)
+    IDENT_INDICES = _sql_col_indices(IDENT_TABLE)
 
     VELOCITY_TABLE = {
         _NAME: VELOCITY,
@@ -85,6 +98,7 @@ class DBSQL(ABC):
         }
     }
     VELOCITY_INSERT = _sql_insert(VELOCITY_TABLE)
+    VELOCITY_INDICES = _sql_col_indices(VELOCITY_TABLE)
 
     POSITION_TABLE = {
         _NAME: POSITION,
@@ -96,6 +110,7 @@ class DBSQL(ABC):
         }
     }
     POSITION_INSERT = _sql_insert(POSITION_TABLE)
+    POSITION_INDICES = _sql_col_indices(POSITION_TABLE)
 
 
     def initialize(self, commit=True):
@@ -132,6 +147,20 @@ class DBSQL(ABC):
     def record_position(self, ts, icao, lat, lon, alt, alt_src):
         self.cur.execute(self.POSITION_INSERT, (ts, icao, lat, lon,
                                                 alt, alt_src))
+    
+
+    def replay_messages(self, start, stop):
+        messages = []
+        for table in (IDENT, VELOCITY, POSITION):
+            self.cur.execute(
+                f'SELECT * FROM {table} WHERE {TIMESTAMP} BETWEEN ? AND ?',
+                (start, stop)
+            )
+            for msg in self.cur.fetchall():
+                messages.append((table,) + msg[1:])
+        messages.sort(key=lambda x: x[1])
+        return messages
+
 
     @abstractmethod
     def __init__(self, max_buffer):

@@ -1,6 +1,8 @@
 TIMESTAMP = 'timestamp'
 ICAO = 'icao'
 
+LAST_UPDATE = 'last_update'
+
 IDENT = 'ident'
 CALLSIGN = 'callsign'
 TYPECODE = 'typecode'

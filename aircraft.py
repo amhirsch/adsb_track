@@ -1,4 +1,5 @@
 from datetime import datetime as dt
+from adsb_track.const import *
 
 class Aircraft:
     def __init__(self, icao):
@@ -24,20 +25,35 @@ class Aircraft:
             f'  {self.heading} degrees, {self.velocity} knots, {self.vertical_speed} ft/sec'
         )
 
-
     def last_update(self):
         update_canidates = [x for x in
                             (self.callsign_update, self.position_update,
                              self.velocity_update) if x is not None]
         if len(update_canidates) > 0:
             return max(update_canidates)
+    
+    def to_json(self):
+        return {
+            ICAO: self.icao,
+            LAST_UPDATE: self.last_update().timestamp(),
+
+            CALLSIGN: self.callsign,
+
+            LATITUDE: self.latitude,
+            LONGITUDE: self.longitude,
+            ALTITUDE: self.altitude,
+
+            ANGLE: self.heading,
+            SPEED: self.velocity,
+            VERTICAL_SPEED: self.vertical_speed,
+        }
 
     def process_timestamp(ts):
         if isinstance(ts, dt):
             return ts
         elif isinstance(ts, float):
             return dt.fromtimestamp(ts)
-    
+
     def is_update(ts, comparison):
         return (comparison is None) or (ts > comparison)
 
@@ -68,18 +84,24 @@ class Airspace:
     def __init__(self):
         self.flights = {}
 
+    def __len__(self):
+        return len(self.flights)
+    
+    def to_json(self):
+        return [x.to_json() for x in self.flights.values()]
+
     def check_aircraft(self, icao):
         if icao not in self.flights:
             self.flights[icao] = Aircraft(icao)
-    
+
     def update_callsign(self, icao, ts, callsign):
         self.check_aircraft(icao)
         self.flights[icao].update_callsign(ts, callsign)
-    
+
     def update_position(self, icao, ts, lat, lon, alt):
         self.check_aircraft(icao)
         self.flights[icao].update_position(ts, lat, lon, alt)
-    
+
     def update_velocity(self, icao, ts, heading, velocity, vertical_speed):
         self.check_aircraft(icao)
         self.flights[icao].update_velocity(ts, heading, velocity,
