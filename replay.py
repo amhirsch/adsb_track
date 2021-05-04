@@ -3,11 +3,14 @@ from adsb_track.const import *
 from adsb_track.aircraft import Airspace
 
 def recreate_airspace(db, datetime=None, previous=60):
-    stop = None
+    stop = datetime if isinstance(datetime, (int, float)) else None
     if datetime is None:
         stop = dt.now().timestamp()
     elif isinstance(datetime, str):
-        stop = dt.fromisoformat(datetime).timestamp()
+        if datetime.lower() == 'last':
+            stop = db.last_message()
+        else:
+            stop = dt.fromisoformat(datetime).timestamp()
     start = stop - previous
 
     airspace = Airspace()
@@ -29,3 +32,8 @@ def recreate_airspace(db, datetime=None, previous=60):
             airspace.update_position(icao, ts, lat, lon, alt)
 
     return airspace
+
+if __name__ == '__main__':
+    from adsb_track.database import DBSQLite
+    db = DBSQLite('test.sqlite3')
+    ac = recreate_airspace(db, 'last')

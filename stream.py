@@ -1,10 +1,16 @@
+from datetime import datetime as dt
 import os
 import sqlite3
+from uuid import uuid4
+
 import pyModeS as pms
 from pyModeS.extra.tcpclient import TcpClient
 
 from adsb_track.aircraft import Aircraft, Airspace
 from adsb_track.database import DBSQLite
+
+def current_timestamp():
+    return dt.now().timestamp()
 
 
 TC_POS = tuple(range(9, 19)) + tuple(range(20, 23))
@@ -14,10 +20,13 @@ TC_IDENT = tuple(range(1,5))
 class FlightRecorder(TcpClient):
     def __init__(self, host, db, gs_lat, gs_lon, port=30005, rawtype='beast', buffer=25):
         super(FlightRecorder, self).__init__(host, port, rawtype)
+        self.session_id = str(uuid4())
         self.gs_lat = gs_lat
         self.gs_lon = gs_lon
         self.airspace = Airspace()
         self.db = DBSQLite(db, buffer)
+        self.db.record_session_start(self.session_id, host, port,
+                                     current_timestamp())
 
     def process_msg(self, msg, ts, icao, tc):
         if tc in TC_POS:
@@ -62,6 +71,7 @@ class FlightRecorder(TcpClient):
         try:
             self.run()
         except KeyboardInterrupt:
+            self.db.record_session_stop(self.session_id, current_timestamp())
             self.db.commit()
 
 

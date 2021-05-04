@@ -21,7 +21,9 @@ def _column_declaration(name, dtype, not_null=True):
     return f"{name} {dtype}{' NOT NULL' if not_null else ''}"
 
 
-def _sql_create(table_def, pk_sql, universal_columns):
+def _sql_create(table_def, pk_sql, universal_columns=None):
+    if universal_columns is None:
+        universal_columns = {}
     column_definitions = deepcopy(universal_columns)
     column_definitions.update(table_def[_COLUMNS])
     sql_columns = [pk_sql]
@@ -54,16 +56,17 @@ def _sql_view(table_def, sql_datetime, limit=20):
     )
 
 
-def _sql_insert(table_def):
-    all_columns = (list(_UNIVERSAL_COLUMNS.keys())
-                    + list(table_def[_COLUMNS].keys()))
+def _sql_insert(table_def, universal_columns=True):
+    all_columns = list(_UNIVERSAL_COLUMNS.keys()) if universal_columns else []
+    all_columns += list(table_def[_COLUMNS].keys())
     columns = ', '.join([x for x in all_columns])
     values = ', '.join(['?'] * len(all_columns))
     return f"INSERT INTO {table_def[_NAME]} ({columns}) VALUES ({values})"
 
 
-def _sql_col_indices(table_def):
-    columns = list(_UNIVERSAL_COLUMNS.keys()) + list(table_def[_COLUMNS].keys())
+def _sql_col_indices(table_def, universal_columns=True):
+    columns = list(_UNIVERSAL_COLUMNS.keys()) if universal_columns else []
+    columns += list(table_def[_COLUMNS].keys())
     index_map = {}
     for i in range(len(columns)):
         index_map[columns[i]] = i
@@ -74,6 +77,18 @@ class DBSQL(ABC):
 
     TIMESTAMP_INDEX = 0
     ICAO_INDEX = 1
+
+    SESSION_TABLE = {
+        _NAME: SESSION,
+        _COLUMNS: {
+            SESSION_UUID: None,
+            HOST: None,
+            PORT: None,
+            START: None,
+            STOP: [None, False],
+        }
+    }
+    SESSION_INDICES = _sql_col_indices(SESSION_TABLE, False)
 
     IDENT_TABLE = {
         _NAME: IDENT,
@@ -114,6 +129,7 @@ class DBSQL(ABC):
 
 
     def initialize(self, commit=True):
+        self.cur.execute(self.SESSION_CREATE)
         self.cur.execute(self.IDENT_CREATE)
         self.cur.execute(self.VELOCITY_CREATE)
         self.cur.execute(self.POSITION_CREATE)
@@ -126,11 +142,34 @@ class DBSQL(ABC):
 
     def insert(func):
         def wrapper(self, *args, **kwargs):
-            self.buffer += 1
-            func(self, *args, **kwargs)
-            if self.buffer >= self.max_buffer:
-                self.commit()
+            try:
+                func(self, *args, **kwargs)
+            except sqlite3.IntegrityError as error:
+                print(e)
+            else:
+                self.buffer += 1
+                if self.buffer >= self.max_buffer:
+                    self.commit()
         return wrapper
+
+    @insert
+    def record_session_start(self, session_uuid, host, port, start):
+        self.cur.execute(
+            (
+                f'INSERT INTO {SESSION} '
+                f'({SESSION_UUID}, {HOST}, {PORT}, {START}) '
+                'VALUES (?,?,?,?)'
+            ),
+            (session_uuid, host, port, start)
+        )
+    
+    @insert
+    def record_session_stop(self, session_uuid, stop):
+        self.cur.execute(
+            f'UPDATE {SESSION} SET {STOP} = ? WHERE {SESSION_UUID} = ?',
+            (stop, session_uuid)
+        )
+
 
     @insert
     def record_ident(self, ts, icao, callsign, tc, cat):
@@ -147,7 +186,6 @@ class DBSQL(ABC):
     def record_position(self, ts, icao, lat, lon, alt, alt_src):
         self.cur.execute(self.POSITION_INSERT, (ts, icao, lat, lon,
                                                 alt, alt_src))
-    
 
     def replay_messages(self, start, stop):
         messages = []
@@ -160,6 +198,17 @@ class DBSQL(ABC):
                 messages.append((table,) + msg[1:])
         messages.sort(key=lambda x: x[1])
         return messages
+
+    def last_message(self):
+        max_time = 0
+        for table in (IDENT, VELOCITY, POSITION):
+            self.cur.execute(
+                f'SELECT {TIMESTAMP} FROM {table} ORDER BY {TIMESTAMP} DESC LIMIT 1'
+            )
+            table_max_time = self.cur.fetchall()[0][0]
+            if table_max_time > max_time:
+                max_time = table_max_time
+        return max_time
 
 
     @abstractmethod
@@ -177,6 +226,16 @@ class DBSQLite(DBSQL):
     SQL_DATETIME = "datetime({}, 'unixepoch', 'localtime')"
 
     UNIVERSAL_COLUMNS = {TIMESTAMP: REAL, ICAO: TEXT}
+
+    SESSION_TABLE = deepcopy(DBSQL.SESSION_TABLE)
+    SESSION_TABLE[_COLUMNS] = {
+        SESSION_UUID: TEXT,
+        HOST: TEXT,
+        PORT: INTEGER,
+        START: REAL,
+        STOP: [REAL, False],
+    }
+    SESSION_CREATE = _sql_create(SESSION_TABLE, PRIMARY_KEY_COL, None)
 
     IDENT_TABLE = deepcopy(DBSQL.IDENT_TABLE)
     IDENT_TABLE[_COLUMNS] = {

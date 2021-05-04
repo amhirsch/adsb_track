@@ -3,6 +3,13 @@ ICAO = 'icao'
 
 LAST_UPDATE = 'last_update'
 
+SESSION = 'session'
+SESSION_UUID = 'session_uuid'
+HOST = 'host'
+PORT = 'port'
+START = 'start'
+STOP = 'stop'
+
 IDENT = 'ident'
 CALLSIGN = 'callsign'
 TYPECODE = 'typecode'
