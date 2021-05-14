@@ -5,6 +5,13 @@ name = "pypi"
 
 [packages]
 pymodes = "*"
+jupyterlab = "*"
+plotly = "*"
+ipywidgets = "*"
+pandas = "*"
+geopandas = "*"
+matplotlib = "*"
+seaborn = "*"
 
 [dev-packages]
 ipython = "*"

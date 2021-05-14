@@ -1,2 +1,4 @@
+.ipynb_checkpoints/
+*.ipynb
 *.sqlite3
 traceback.txt
