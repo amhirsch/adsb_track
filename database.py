@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
+from const import DURATION
 from copy import deepcopy
 import sqlite3
+
+import pandas as pd
 
 from adsb_track.const import *
 
@@ -198,6 +201,32 @@ class DBSQL(ABC):
                 messages.append((table,) + msg[1:])
         messages.sort(key=lambda x: x[1])
         return messages
+    
+    def list_sessions(self):
+        df = pd.read_sql_query(f'SELECT * FROM {SESSION}', self.con)
+        df.drop(columns='id', inplace=True)
+        string_col = [SESSION_UUID, HOST]
+        df.loc[:, string_col] = df.loc[:, string_col].convert_dtypes()
+        for col in START, STOP:
+            df[col] = pd.to_datetime(df[col], unit='s')
+        df[DURATION] = df[STOP] - df[START]
+        return df
+    
+    def replay_session(self, session_uuid):
+        self.cur.execute(f'SELECT {SESSION_UUID} FROM {SESSION}')
+        all_sessions = [x[0] for x in self.cur.fetchall()]
+        if session_uuid in all_sessions:
+            self.cur.execute(
+                (f'SELECT {START}, {STOP} FROM {SESSION} '
+                 f'WHERE {SESSION_UUID} IS ?'),
+                (session_uuid,)
+            )
+            start, stop = self.cur.fetchone()
+            return self.replay_messages(start, stop)
+        raise ValueError('Session UUID not found')
+        
+    # def replay_session(self, session_uuid):
+    #     pass
 
     def last_message(self):
         max_time = 0

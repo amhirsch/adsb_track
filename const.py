@@ -9,6 +9,7 @@ HOST = 'host'
 PORT = 'port'
 START = 'start'
 STOP = 'stop'
+DURATION = 'duration'
 
 IDENT = 'ident'
 CALLSIGN = 'callsign'
