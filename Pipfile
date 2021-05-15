@@ -12,6 +12,7 @@ pandas = "*"
 geopandas = "*"
 matplotlib = "*"
 seaborn = "*"
+geopy = "*"
 
 [dev-packages]
 ipython = "*"
