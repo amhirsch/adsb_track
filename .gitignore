@@ -1,4 +1,3 @@
-.ipynb_checkpoints/
-*.ipynb
+dist/
+*.egg-info/
 *.sqlite3
-traceback.txt
