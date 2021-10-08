@@ -8,9 +8,12 @@ pymodes = "*"
 pandas = "*"
 
 [dev-packages]
-ipython = "*"
+setuptools = "*"
+wheel = "*"
 build = "*"
 twine = "*"
+sphinx = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.9"
