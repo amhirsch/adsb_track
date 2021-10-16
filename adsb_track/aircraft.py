@@ -2,7 +2,13 @@ from datetime import datetime as dt
 import pandas as pd
 from adsb_track.const import *
 
+
 class Aircraft:
+    """A representation of an aircraft over time
+    
+    :param str icao: The ICAO24 code of the aircraft, used as its unique identifier.
+    """
+
     def __init__(self, icao):
         self.icao = icao
 
@@ -23,11 +29,13 @@ class Aircraft:
         self.velocity_history = []
 
     def __str__(self):
+
         def title():
             icao_lowercase = self.icao.lower()
             if self.callsign is None:
                 return self.icao.lower()
             return f'{self.callsign} / {icao_lowercase}'
+
         return (
             f"------ {title()} ------\n"
             f'  ({self.latitude}, {self.longitude})  {self.altitude} ft\n'
@@ -35,9 +43,15 @@ class Aircraft:
         )
 
     def last_update(self):
-        update_canidates = [x for x in
-                            (self.callsign_update, self.position_update,
-                             self.velocity_update) if x is not None]
+        """The last time the aircraft reported.
+
+        :returns: The latest timestamp of either the callsign, position, or velocity.
+        :rtype: pandas.Timestamp
+        """
+        update_canidates = [
+            x for x in (self.callsign_update, self.position_update,
+                        self.velocity_update) if x is not None
+        ]
         if len(update_canidates) > 0:
             return max(update_canidates)
 
@@ -45,13 +59,10 @@ class Aircraft:
         return {
             ICAO: self.icao,
             LAST_UPDATE: self.last_update().timestamp(),
-
             CALLSIGN: self.callsign,
-
             LATITUDE: self.latitude,
             LONGITUDE: self.longitude,
             ALTITUDE: self.altitude,
-
             ANGLE: self.heading,
             SPEED: self.velocity,
             VERTICAL_SPEED: self.vertical_speed,
@@ -70,29 +81,25 @@ class Aircraft:
 
     def get_callsign_history(self):
         if self.callsign_history:
-            return pd.DataFrame(
-                self.callsign_history,
-                columns=[TIMESTAMP, CALLSIGN]
-            ).convert_dtypes()
+            return pd.DataFrame(self.callsign_history,
+                                columns=[TIMESTAMP, CALLSIGN]).convert_dtypes()
 
     def get_position_history(self):
         if self.position_history:
             return pd.DataFrame(
                 self.position_history,
-                columns=[TIMESTAMP, LATITUDE, LONGITUDE, ALTITUDE]
-            )
+                columns=[TIMESTAMP, LATITUDE, LONGITUDE, ALTITUDE])
 
     def get_velocity_history(self):
         if self.velocity_history:
             return pd.DataFrame(
                 self.velocity_history,
-                columns=[TIMESTAMP, ANGLE, VELOCITY, VERTICAL_SPEED]
-            )
+                columns=[TIMESTAMP, ANGLE, VELOCITY, VERTICAL_SPEED])
 
     def get_track(self):
-        df = pd.concat((self.get_callsign_history(),
-                        self.get_position_history(),
-                        self.get_velocity_history()))
+        df = pd.concat(
+            (self.get_callsign_history(), self.get_position_history(),
+             self.get_velocity_history()))
         df.sort_values(TIMESTAMP, inplace=True)
         df.reset_index(drop=True, inplace=True)
         return df.convert_dtypes(convert_floating=False)
@@ -106,7 +113,7 @@ class Aircraft:
 
     def update_position(self, ts, lat, lon, alt):
         ts = Aircraft.process_timestamp(ts)
-        if  Aircraft.is_update(ts, self.position_update):
+        if Aircraft.is_update(ts, self.position_update):
             self.position_update = ts
             self.latitude = lat
             self.longitude = lon
@@ -121,11 +128,11 @@ class Aircraft:
             self.velocity = velocity
             self.vertical_speed = vertical_speed
             self.velocity_history.append(
-                (ts, heading, velocity, vertical_speed)
-            )
+                (ts, heading, velocity, vertical_speed))
 
 
 class Airspace:
+
     def __init__(self):
         self.flights = {}
 
@@ -154,9 +161,8 @@ class Airspace:
         self.check_aircraft(icao).update_position(ts, lat, lon, alt)
 
     def update_velocity(self, icao, ts, heading, velocity, vertical_speed):
-        self.check_aircraft(icao).update_velocity(
-            ts, heading, velocity, vertical_speed
-        )
+        self.check_aircraft(icao).update_velocity(ts, heading, velocity,
+                                                  vertical_speed)
 
     def __str__(self):
-        return ('\n'*2).join([str(x) for x in self.flights.values()])
+        return ('\n' * 2).join([str(x) for x in self.flights.values()])
