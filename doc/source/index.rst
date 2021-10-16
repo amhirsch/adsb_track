@@ -10,6 +10,8 @@ Welcome to ADS-B Track's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   aircraft
+
 
 
 Indices and tables
