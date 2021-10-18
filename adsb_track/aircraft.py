@@ -4,9 +4,13 @@ from adsb_track.const import *
 
 
 class Aircraft:
-    """A representation of an aircraft over time
-    
-    :param str icao: The ICAO24 code of the aircraft, used as its unique identifier.
+    """
+    A representation of an aircraft over time
+
+    Parameters
+    ----------
+    icao : str
+        The ICAO24 code of the aircraft, used as its unique identifier.
     """
 
     def __init__(self, icao):
@@ -43,10 +47,13 @@ class Aircraft:
         )
 
     def last_update(self):
-        """The last time the aircraft reported.
+        """
+        The last time the aircraft reported.
 
-        :returns: The latest timestamp of either the callsign, position, or velocity.
-        :rtype: pandas.Timestamp
+        Returns
+        -------
+        pandas.Timestamp
+            The latest timestamp of either the callsign, position, or velocity.
         """
         update_canidates = [
             x for x in (self.callsign_update, self.position_update,
@@ -56,6 +63,14 @@ class Aircraft:
             return max(update_canidates)
 
     def to_json(self):
+        """
+        Exports the aircraft data in JSON format.
+
+        Returns
+        -------
+        dict
+            The aircraft data in JSON format
+        """
         return {
             ICAO: self.icao,
             LAST_UPDATE: self.last_update().timestamp(),

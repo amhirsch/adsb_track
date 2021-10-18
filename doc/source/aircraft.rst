@@ -1,5 +1,5 @@
 Aircraft
 ========
 
-.. autoclass:: adsb_track.aircraft.Aircraft
+.. autoclass:: adsb_track.Aircraft
     :members:
