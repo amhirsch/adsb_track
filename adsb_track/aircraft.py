@@ -95,23 +95,56 @@ class Aircraft:
         return (comparison is None) or (ts > comparison)
 
     def get_callsign_history(self):
+        """
+        Produces a time series of recorded call sign.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe with timestamps and callsigns.
+        """
         if self.callsign_history:
             return pd.DataFrame(self.callsign_history,
                                 columns=[TIMESTAMP, CALLSIGN]).convert_dtypes()
 
     def get_position_history(self):
+        """
+        Produces a time series of position data.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe with timestamps, latitude, longitude, and altitude.
+        """
         if self.position_history:
             return pd.DataFrame(
                 self.position_history,
                 columns=[TIMESTAMP, LATITUDE, LONGITUDE, ALTITUDE])
 
     def get_velocity_history(self):
+        """
+        Produces a time series of velocity.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe with heading, speed, and vertical speed.
+        """
         if self.velocity_history:
             return pd.DataFrame(
                 self.velocity_history,
                 columns=[TIMESTAMP, ANGLE, VELOCITY, VERTICAL_SPEED])
 
     def get_track(self):
+        """
+        Provides a single dataframe with all of callsign, position, and altitude
+        history.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe of callsign, position, and altitude concatenated.
+        """
         df = pd.concat(
             (self.get_callsign_history(), self.get_position_history(),
              self.get_velocity_history()))
@@ -120,6 +153,17 @@ class Aircraft:
         return df.convert_dtypes(convert_floating=False)
 
     def update_callsign(self, ts, callsign):
+        """
+        Updates the aircraft callsign at a given time.
+
+        Parameters
+        ----------
+        ts : Pandas Timestamp or float or Python datetime
+            The time at which the callsign record occurred. If the input is a
+            float, that is the seconds since the UNIX epoch.
+        callsign : str
+            The aircraft callsign
+        """
         ts = Aircraft.process_timestamp(ts)
         if Aircraft.is_update(ts, self.callsign_update):
             self.callsign_update = ts
@@ -127,6 +171,20 @@ class Aircraft:
             self.callsign_history.append((ts, callsign))
 
     def update_position(self, ts, lat, lon, alt):
+        """
+        Updates the aircraft velocity at a given time.
+
+        Parameters
+        ----------
+        ts : Pandas Timestamp, float, Python datetime
+            The time at which the velocity was recorded.
+        lat : float
+            Latitude
+        lon : float
+            Longitude
+        alt : int
+            Altitude
+        """
         ts = Aircraft.process_timestamp(ts)
         if Aircraft.is_update(ts, self.position_update):
             self.position_update = ts
@@ -136,6 +194,20 @@ class Aircraft:
             self.position_history.append((ts, lat, lon, alt))
 
     def update_velocity(self, ts, heading, velocity, vertical_speed):
+        """
+        Updates the aircraft position at a given time.
+
+        Parameters
+        ----------
+        ts : Pandas Timestamp, float, Python datetime
+            The time at which the velocity was recorded.
+        heading : float
+            Heading
+        velocity : int
+            Velocity
+        vertical_speed : int
+            Vertical speed
+        """
         ts = Aircraft.process_timestamp(ts)
         if Aircraft.is_update(ts, self.velocity_update):
             self.velocity_update = ts
@@ -147,6 +219,7 @@ class Aircraft:
 
 
 class Airspace:
+    """A representation of the entire airspace."""
 
     def __init__(self):
         self.flights = {}
@@ -155,27 +228,110 @@ class Airspace:
         return len(self.flights)
 
     def to_json(self):
+        """
+        JSON representation of all aircraft in airspace.
+
+        Returns
+        -------
+        list
+            A JSON list of all the aircraft included in airspace.
+        """
         return [x.to_json() for x in self.flights.values()]
 
     def aircraft_present(self):
+        """
+        Lists all aircraft in the airspace.
+
+        Returns
+        -------
+        dict_keys
+            A set of ICAO24 codes
+        """
         return self.flights.keys()
 
     def get_aircraft(self, icao):
+        """
+        Attempts to find the specified aircraft
+
+        Parameters
+        ----------
+        icao : str
+            ICAO24 address
+
+        Returns
+        -------
+        adsb_track.Aircraft or None
+            The aircraft if found
+        """
         return self.flights.get(icao.upper())
 
     def check_aircraft(self, icao):
+        """
+        Finds aircraft in airspace or creates a new one.
+
+        Returns
+        -------
+        adsb_track.Aircraft
+            The aircraft (possibly a new one) in the airspace with the
+            corresponding ICAO24 code.
+        """
         icao_uppper = icao.upper()
         if icao_uppper not in self.flights:
             self.flights[icao_uppper] = Aircraft(icao_uppper)
         return self.flights[icao_uppper]
 
     def update_callsign(self, icao, ts, callsign):
+        """
+        Updates the callsign information of the aircraft.
+
+        Parameters
+        ----------
+        icao : str
+            ICAO24 code
+        ts : Pandas Timestamp or float or Python datetime
+            The time at which the callsign record occurred. If the input is a
+            float, that is the seconds since the UNIX epoch.
+        callsign : str
+            The aircraft callsign
+        """
         self.check_aircraft(icao).update_callsign(ts, callsign)
 
     def update_position(self, icao, ts, lat, lon, alt):
+        """
+        Updates the position information of an aircraft.
+
+        Parameters
+        ----------
+        icao : str
+            ICAO24 code
+        ts : Pandas Timestamp, float, Python datetime
+            The time at which the velocity was recorded.
+        lat : float
+            Latitude
+        lon : float
+            Longitude
+        alt : int
+            Altitude
+        """
         self.check_aircraft(icao).update_position(ts, lat, lon, alt)
 
     def update_velocity(self, icao, ts, heading, velocity, vertical_speed):
+        """
+        Updates the velocity information of an aircraft
+
+        Parameters
+        ----------
+        icao : str
+            ICAO24 code
+        ts : Pandas Timestamp, float, Python datetime
+            The time at which the velocity was recorded.
+        heading : float
+            Heading
+        velocity : int
+            Velocity
+        vertical_speed : int
+            Vertical speed
+        """
         self.check_aircraft(icao).update_velocity(ts, heading, velocity,
                                                   vertical_speed)
 

@@ -1,1 +1,1 @@
-from adsb_track.aircraft import Aircraft
+from adsb_track.aircraft import Aircraft, Airspace
