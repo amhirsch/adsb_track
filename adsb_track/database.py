@@ -1,18 +1,19 @@
 from abc import ABC, abstractmethod
-from const import DURATION
+from adsb_track.const import DURATION
 from copy import deepcopy
+from functools import wraps
 import sqlite3
 
 import pandas as pd
 
 from adsb_track.const import *
 
-
 _NAME = 'name'
 _COLUMNS = 'columns'
 
-_CREATE_TABLE, _CREATE_VIEW = [f'CREATE {x} IF NOT EXISTS'
-                               for x in ('TABLE', 'VIEW')]
+_CREATE_TABLE, _CREATE_VIEW = [
+    f'CREATE {x} IF NOT EXISTS' for x in ('TABLE', 'VIEW')
+]
 
 _UNIVERSAL_COLUMNS = {
     TIMESTAMP: None,
@@ -51,12 +52,10 @@ def _sql_create(table_def, pk_sql, universal_columns=None):
 def _sql_view(table_def, sql_datetime, limit=20):
     view_name = table_def[_NAME] + '_recent'
     datetime_col = sql_datetime.format(TIMESTAMP)
-    columns = ', '.join([datetime_col, ICAO]
-                         + list(table_def[_COLUMNS].keys()))
+    columns = ', '.join([datetime_col, ICAO] + list(table_def[_COLUMNS].keys()))
     return (
         f'{_CREATE_VIEW} {view_name} AS SELECT {columns} FROM {table_def[_NAME]} '
-        f'ORDER BY {TIMESTAMP} DESC LIMIT {limit}'
-    )
+        f'ORDER BY {TIMESTAMP} DESC LIMIT {limit}')
 
 
 def _sql_insert(table_def, universal_columns=True):
@@ -130,8 +129,12 @@ class DBSQL(ABC):
     POSITION_INSERT = _sql_insert(POSITION_TABLE)
     POSITION_INDICES = _sql_col_indices(POSITION_TABLE)
 
-
     def initialize(self, commit=True):
+        """Initializes the database
+        
+        Args:
+            commit (bool): Commits the changes
+        """
         self.cur.execute(self.SESSION_CREATE)
         self.cur.execute(self.IDENT_CREATE)
         self.cur.execute(self.VELOCITY_CREATE)
@@ -144,6 +147,11 @@ class DBSQL(ABC):
         self.buffer = 0
 
     def insert(func):
+        """
+        Inserts a row into the database
+        """
+
+        @wraps(func)
         def wrapper(self, *args, **kwargs):
             try:
                 func(self, *args, **kwargs)
@@ -153,56 +161,110 @@ class DBSQL(ABC):
                 self.buffer += 1
                 if self.buffer >= self.max_buffer:
                     self.commit()
+
         return wrapper
 
     @insert
     def record_session_start(self, session_uuid, host, port, start):
-        self.cur.execute(
-            (
-                f'INSERT INTO {SESSION} '
-                f'({SESSION_UUID}, {HOST}, {PORT}, {START}) '
-                'VALUES (?,?,?,?)'
-            ),
-            (session_uuid, host, port, start)
-        )
-    
+        """Records the start time of a session
+
+        Args:
+            session_uuid (str): Active session UUID
+            host (str): Active session host
+            port (int): Active session port
+            start: Active session start time
+        """
+        self.cur.execute((f'INSERT INTO {SESSION} '
+                          f'({SESSION_UUID}, {HOST}, {PORT}, {START}) '
+                          'VALUES (?,?,?,?)'),
+                         (session_uuid, host, port, start))
+
     @insert
     def record_session_stop(self, session_uuid, stop):
+        """Records the end time of a session
+
+        Args:
+            session_uuid (str): Active session UUID
+            stop: Active session end time
+        """
         self.cur.execute(
             f'UPDATE {SESSION} SET {STOP} = ? WHERE {SESSION_UUID} = ?',
-            (stop, session_uuid)
-        )
-
+            (stop, session_uuid))
 
     @insert
     def record_ident(self, ts, icao, callsign, tc, cat):
+        """Records an identification message
+
+        Args:
+            ts (float): Message timestamp
+            icao (str): Aircraft ICAO24 code
+            callsign (str): Aircraft callsign
+            tc (int): Aircraft typecode
+            cat (int): Aircraft category
+        """
         self.cur.execute(self.IDENT_INSERT, (ts, icao, callsign, tc, cat))
 
     # Order meant to match pyModeS return
     @insert
-    def record_velocity(self, ts, icao, spd, angle, vs, spd_type,
-                        angle_src, vs_src):
-        self.cur.execute(self.VELOCITY_INSERT, (ts, icao, spd, spd_type,
-                                                vs, vs_src,angle, angle_src))
+    def record_velocity(self, ts, icao, spd, angle, vs, spd_type, angle_src,
+                        vs_src):
+        """Records a velocity message
+
+        Args:
+            ts (float): Message timestamp
+            icao (str): Aircraft ICAO24 code
+            spd (int): Aircraft speed
+            angle (float): Aircraft heading
+            vs (int): Aircraft vertical speed
+            spd_type (str): Type of speed recorded
+            angle_src (str): Source of heading measurement
+            vs_src (str): Source of vertical speed measurement
+        """
+        self.cur.execute(
+            self.VELOCITY_INSERT,
+            (ts, icao, spd, spd_type, vs, vs_src, angle, angle_src))
 
     @insert
     def record_position(self, ts, icao, lat, lon, alt, alt_src):
-        self.cur.execute(self.POSITION_INSERT, (ts, icao, lat, lon,
-                                                alt, alt_src))
+        """Records a position message
+        
+        Args:
+            ts (float): Message timestamp
+            icao (str): Aircraft ICAO24 code
+            lat (float): Aircraft latitude
+            lon (float): Aircraft longitude
+            alt (int): Aircraft altitude
+            alt_src (str): Source of altitude measurement
+        """
+        self.cur.execute(self.POSITION_INSERT,
+                         (ts, icao, lat, lon, alt, alt_src))
 
     def replay_messages(self, start, stop):
+        """Replays the message in a given time duration
+
+        Args:
+            start (float): Start time, seconds since UNIX epoch
+            stop (float): Stop time, seconds since UNIX epoch
+        
+        Returns:
+            list of tuples: The messages captured in the time duration
+        """
         messages = []
         for table in (IDENT, VELOCITY, POSITION):
             self.cur.execute(
                 f'SELECT * FROM {table} WHERE {TIMESTAMP} BETWEEN ? AND ?',
-                (start, stop)
-            )
+                (start, stop))
             for msg in self.cur.fetchall():
                 messages.append((table,) + msg[1:])
         messages.sort(key=lambda x: x[1])
         return messages
-    
+
     def list_sessions(self):
+        """Lists the recording sessions of the receiver
+        
+        Returns:
+            list of tuples: The sessions found in the database.
+        """
         df = pd.read_sql_query(f'SELECT * FROM {SESSION}', self.con)
         df.drop(columns='id', inplace=True)
         string_col = [SESSION_UUID, HOST]
@@ -211,24 +273,34 @@ class DBSQL(ABC):
             df[col] = pd.to_datetime(df[col], unit='s')
         df[DURATION] = df[STOP] - df[START]
         return df
-    
+
     def replay_session(self, session_uuid):
+        """Replays the messages of a specified session.
+        
+        Args:
+            session_uuid (str): Session ID
+        
+        Returns:
+            list of tuples: the messages in the given session.
+        """
         self.cur.execute(f'SELECT {SESSION_UUID} FROM {SESSION}')
         all_sessions = [x[0] for x in self.cur.fetchall()]
         if session_uuid in all_sessions:
-            self.cur.execute(
-                (f'SELECT {START}, {STOP} FROM {SESSION} '
-                 f'WHERE {SESSION_UUID} IS ?'),
-                (session_uuid,)
-            )
+            self.cur.execute((f'SELECT {START}, {STOP} FROM {SESSION} '
+                              f'WHERE {SESSION_UUID} IS ?'), (session_uuid,))
             start, stop = self.cur.fetchone()
             return self.replay_messages(start, stop)
         raise ValueError('Session UUID not found')
-        
+
     # def replay_session(self, session_uuid):
     #     pass
 
     def last_message(self):
+        """Time of most recent message in database.
+        
+        Returns:
+            float: The last message found in the database.
+        """
         max_time = 0
         for table in (IDENT, VELOCITY, POSITION):
             self.cur.execute(
@@ -238,7 +310,6 @@ class DBSQL(ABC):
             if table_max_time > max_time:
                 max_time = table_max_time
         return max_time
-
 
     @abstractmethod
     def __init__(self, max_buffer):

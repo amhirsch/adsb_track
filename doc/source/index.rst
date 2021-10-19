@@ -11,7 +11,8 @@ Welcome to ADS-B Track's documentation!
    :caption: Contents:
 
    aircraft
-
+   database_api
+   database_schema
 
 
 Indices and tables
