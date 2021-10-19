@@ -13,6 +13,7 @@ Welcome to ADS-B Track's documentation!
    aircraft
    database_api
    database_schema
+   replay
 
 
 Indices and tables
