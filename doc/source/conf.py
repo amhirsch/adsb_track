@@ -17,11 +17,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'ADS-B Track'
-copyright = '2021, Xander Hirsch'
+copyright = '2021, Alexander Hirsch'
 author = 'Xander Hirsch'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '0.1.0'
 
 # -- General configuration ---------------------------------------------------
 
