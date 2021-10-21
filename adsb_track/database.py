@@ -156,7 +156,7 @@ class DBSQL(ABC):
             try:
                 func(self, *args, **kwargs)
             except sqlite3.IntegrityError as error:
-                print(e)
+                print(error)
             else:
                 self.buffer += 1
                 if self.buffer >= self.max_buffer:

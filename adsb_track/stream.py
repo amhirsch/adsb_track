@@ -9,16 +9,25 @@ from pyModeS.extra.tcpclient import TcpClient
 from adsb_track.aircraft import Aircraft, Airspace
 from adsb_track.database import DBSQLite
 
+
 def current_timestamp():
     return dt.now().timestamp()
 
 
 TC_POS = tuple(range(9, 19)) + tuple(range(20, 23))
-TC_IDENT = tuple(range(1,5))
+TC_IDENT = tuple(range(1, 5))
 
 
 class FlightRecorder(TcpClient):
-    def __init__(self, host, db, gs_lat, gs_lon, port=30005, rawtype='beast', buffer=25):
+
+    def __init__(self,
+                 host,
+                 db,
+                 gs_lat,
+                 gs_lon,
+                 port=30005,
+                 rawtype='beast',
+                 buffer=25):
         super(FlightRecorder, self).__init__(host, port, rawtype)
         self.session_id = str(uuid4())
         self.gs_lat = gs_lat
@@ -62,7 +71,7 @@ class FlightRecorder(TcpClient):
 
     def handle_messages(self, messages):
         for msg, ts in messages:
-            if all((len(msg)==28, pms.df(msg)==17, pms.crc(msg)==0)):
+            if len(msg) == 28 and pms.df(msg) == 17 and pms.crc(msg) == 0:
                 icao = pms.adsb.icao(msg)
                 tc = pms.adsb.typecode(msg)
                 self.process_msg(msg, ts, icao, tc)
@@ -73,10 +82,3 @@ class FlightRecorder(TcpClient):
         except KeyboardInterrupt:
             self.db.record_session_stop(self.session_id, current_timestamp())
             self.db.commit()
-
-
-if __name__ == '__main__':
-    gs_lat = float(os.environ.get('ADSB_LATITUDE', '34'))
-    gs_lon = float(os.environ.get('ADSB_LONGITUDE', '-118.2'))
-    client = FlightRecorder('pi.lan.xanderhirsch.us', 'test.sqlite3', gs_lat, gs_lon)
-    client.record()
