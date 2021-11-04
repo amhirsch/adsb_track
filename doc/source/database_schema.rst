@@ -3,7 +3,7 @@ Database Schema
 
 Tables
 ------
-* ``CREATE TABLE session (id INTEGER PRIMARY KEY AUTOINCREMENT, session_uuid TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, start REAL NOT NULL, stop REAL);``
+* ``CREATE TABLE session (id INTEGER PRIMARY KEY AUTOINCREMENT, session_hash TEXT NOT NULL, host TEXT NOT NULL, port INTEGER NOT NULL, start REAL NOT NULL, stop REAL);``
 * ``CREATE TABLE ident (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, icao TEXT NOT NULL, callsign TEXT NOT NULL, typecode INTEGER NOT NULL, category INTEGER NOT NULL);``
 * ``CREATE TABLE velocity (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, icao TEXT NOT NULL, speed INTEGER NOT NULL, speed_type TEXT NOT NULL, vertical_speed INTEGER NOT NULL, vertical_speed_src TEXT NOT NULL, angle REAL NOT NULL, angle_src TEXT NOT NULL);``
 * ``CREATE TABLE position (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, icao TEXT NOT NULL, latitude REAL, longitude REAL, altitude INTEGER NOT NULL, altitude_src TEXT NOT NULL);``

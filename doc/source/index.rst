@@ -14,6 +14,7 @@ Welcome to ADS-B Track's documentation!
    database_api
    database_schema
    replay
+   utilities
 
 
 Indices and tables

@@ -4,7 +4,7 @@ ICAO = 'icao'
 LAST_UPDATE = 'last_update'
 
 SESSION = 'session'
-SESSION_UUID = 'session_uuid'
+SESSION_HASH = 'session_hash'
 HOST = 'host'
 PORT = 'port'
 START = 'start'

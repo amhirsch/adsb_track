@@ -1,13 +1,11 @@
 from datetime import datetime as dt
-import os
-import sqlite3
-from uuid import uuid4
 
 import pyModeS as pms
 from pyModeS.extra.tcpclient import TcpClient
 
-from adsb_track.aircraft import Aircraft, Airspace
+from adsb_track.aircraft import Airspace
 from adsb_track.database import DBSQLite
+from adsb_track.session import session_hash
 
 
 def current_timestamp():
@@ -29,13 +27,13 @@ class FlightRecorder(TcpClient):
                  rawtype='beast',
                  buffer=25):
         super(FlightRecorder, self).__init__(host, port, rawtype)
-        self.session_id = str(uuid4())
+        now = current_timestamp()
+        self.session_id = session_hash(host, port, rawtype, now)
         self.gs_lat = gs_lat
         self.gs_lon = gs_lon
         self.airspace = Airspace()
         self.db = DBSQLite(db, buffer)
-        self.db.record_session_start(self.session_id, host, port,
-                                     current_timestamp())
+        self.db.record_session_start(self.session_id, host, port, now)
 
     def process_msg(self, msg, ts, icao, tc):
         if tc in TC_POS:

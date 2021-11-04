@@ -83,7 +83,7 @@ class DBSQL(ABC):
     SESSION_TABLE = {
         _NAME: SESSION,
         _COLUMNS: {
-            SESSION_UUID: None,
+            SESSION_HASH: None,
             HOST: None,
             PORT: None,
             START: None,
@@ -165,19 +165,19 @@ class DBSQL(ABC):
         return wrapper
 
     @insert
-    def record_session_start(self, session_uuid, host, port, start):
+    def record_session_start(self, session_hash, host, port, start):
         """Records the start time of a session
 
         Args:
-            session_uuid (str): Active session UUID
+            session_hash (str): Active session UUID
             host (str): Active session host
             port (int): Active session port
             start: Active session start time
         """
         self.cur.execute((f'INSERT INTO {SESSION} '
-                          f'({SESSION_UUID}, {HOST}, {PORT}, {START}) '
+                          f'({SESSION_HASH}, {HOST}, {PORT}, {START}) '
                           'VALUES (?,?,?,?)'),
-                         (session_uuid, host, port, start))
+                         (session_hash, host, port, start))
 
     @insert
     def record_session_stop(self, session_uuid, stop):
@@ -188,7 +188,7 @@ class DBSQL(ABC):
             stop: Active session end time
         """
         self.cur.execute(
-            f'UPDATE {SESSION} SET {STOP} = ? WHERE {SESSION_UUID} = ?',
+            f'UPDATE {SESSION} SET {STOP} = ? WHERE {SESSION_HASH} = ?',
             (stop, session_uuid))
 
     @insert
@@ -267,7 +267,7 @@ class DBSQL(ABC):
         """
         df = pd.read_sql_query(f'SELECT * FROM {SESSION}', self.con)
         df.drop(columns='id', inplace=True)
-        string_col = [SESSION_UUID, HOST]
+        string_col = [SESSION_HASH, HOST]
         df.loc[:, string_col] = df.loc[:, string_col].convert_dtypes()
         for col in START, STOP:
             df[col] = pd.to_datetime(df[col], unit='s')
@@ -283,11 +283,11 @@ class DBSQL(ABC):
         Returns:
             list of tuples: the messages in the given session.
         """
-        self.cur.execute(f'SELECT {SESSION_UUID} FROM {SESSION}')
+        self.cur.execute(f'SELECT {SESSION_HASH} FROM {SESSION}')
         all_sessions = [x[0] for x in self.cur.fetchall()]
         if session_uuid in all_sessions:
             self.cur.execute((f'SELECT {START}, {STOP} FROM {SESSION} '
-                              f'WHERE {SESSION_UUID} IS ?'), (session_uuid,))
+                              f'WHERE {SESSION_HASH} IS ?'), (session_uuid,))
             start, stop = self.cur.fetchone()
             return self.replay_messages(start, stop)
         raise ValueError('Session UUID not found')
@@ -329,7 +329,7 @@ class DBSQLite(DBSQL):
 
     SESSION_TABLE = deepcopy(DBSQL.SESSION_TABLE)
     SESSION_TABLE[_COLUMNS] = {
-        SESSION_UUID: TEXT,
+        SESSION_HASH: TEXT,
         HOST: TEXT,
         PORT: INTEGER,
         START: REAL,
