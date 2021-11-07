@@ -4,16 +4,17 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+dash = "*"
 pymodes = "*"
 pandas = "*"
+SQLAlchemy = "*"
 
 [dev-packages]
 setuptools = "*"
 wheel = "*"
 build = "*"
-twine = "*"
 sphinx = "*"
 ipython = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.10"
