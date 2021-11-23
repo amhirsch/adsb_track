@@ -1,8 +1,5 @@
-Aircrafts
-=========
+Aircraft
+========
 
-.. autoclass:: adsb_track.Aircraft
-    :members:
-
-.. autoclass:: adsb_track.Airspace
+.. autoclass:: adsb_track.SessionData
     :members:

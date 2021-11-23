@@ -1,6 +1,78 @@
 from datetime import datetime as dt
+
 import pandas as pd
+import numpy as np
+
 from adsb_track.const import *
+import adsb_track.const as const
+
+
+class SessionData:
+
+    def __init__(self, df_ident, df_velocity, df_position):
+        self.df_ident = df_ident
+        self.df_velocity = df_velocity
+        self.df_position = df_position
+        self.unique_icao = np.unique(
+            np.concatenate([
+                x[const.ICAO].unique()
+                for x in (df_ident, df_velocity, df_position)
+            ]))
+
+    def unique_icao(self):
+        """Unique ICAO addresses in the message dataframes.
+
+        Args:
+            message_dataframes (Iterable[pandas.DataFrame]): The dataframes from
+                the session output. The column with ICAO24 codes is expected to
+                be 'icao'.
+
+        Returns:
+            Iterable[str]: The unique ICAO24 codes found across the input
+                dataframes.
+        """
+        return self.unique_icao
+
+    def isolate_icao(self, icao):
+        """Isolates the messages of an aircraft from many dataframes.
+
+        Args:
+            icao (str): The ICAO24 code to isolate.
+
+        Returns:
+            Iterable[pandas.DataFrame]: A deepcopy of a subset of the input
+                message_dataframes where the ICAO24 code matches the icao input
+                parameter.
+        """
+        if icao not in self.unique_icao:
+            return ValueError(f'The ICAO24 code {icao} could not be found in '
+                              'any messages.')
+        return tuple([
+            x[x[const.ICAO] == icao].copy()
+            for x in (self.df_ident, self.df_velocity, self.df_position)
+        ])
+
+    def build_track(self, icao):
+        """Constructs the track of an aircraft from different types of messages.
+
+        Args:
+            icao (str): The ICAO24 code to isolate.
+
+        Returns:
+            pandas.DataFrame: A single dataframe constructed with the most
+                recent information of each type.
+        """
+        if icao not in self.unique_icao:
+            return ValueError(f'The ICAO24 code {icao} could not be found in '
+                              'any messages.')
+        df_ident, df_velocity, df_position = self.isolate_icao(icao)
+        df_ident[const.MSG_TYPE] = const.IDENT
+        df_velocity[const.MSG_TYPE] = const.VELOCITY
+        df_position[const.MSG_TYPE] = const.POSITION
+        df = pd.concat([df_ident, df_velocity, df_position])
+        df.sort_values(const.TIMESTAMP, inplace=True)
+        df.ffill(inplace=True)
+        return df
 
 
 class Aircraft:

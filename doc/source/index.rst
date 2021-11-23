@@ -10,11 +10,8 @@ Welcome to ADS-B Track's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   database
    aircraft
-   database_api
-   database_schema
-   replay
-   utilities
 
 
 Indices and tables

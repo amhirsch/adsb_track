@@ -1,3 +1,2 @@
-from adsb_track.aircraft import Aircraft, Airspace
-from adsb_track.database import DBSQLite
-from adsb_track.session import session_hash
+from adsb_track.aircraft import SessionData
+from adsb_track.database import Database

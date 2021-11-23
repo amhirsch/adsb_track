@@ -2,6 +2,7 @@ TIMESTAMP = 'timestamp'
 ICAO = 'icao'
 
 LAST_UPDATE = 'last_update'
+MSG_TYPE = 'msg_type'
 
 SESSION = 'session'
 SESSION_HASH = 'session_hash'
